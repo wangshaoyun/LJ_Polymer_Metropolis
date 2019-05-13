@@ -19,6 +19,7 @@ module compute_energy
   real*8,  private :: rv_lj       !Verlet list radius of LJ potential
   real*8,  private :: rsk_lj      !Skin between cut off sphere and verlet list 
                                   !sphere
+  integer, private :: npair1      !number of pairs in the lj verlet sphere
 !
 !fene potential
   real*8,  private :: R0_2        !Max bond length R0 square in FENE potential
@@ -157,17 +158,6 @@ subroutine LJ_energy (EE)
     end do
   end do
 
-  do i = 1, NN
-    if ( pos(i,3) > 0 .and. pos(i,3) < 0.86 ) then
-      rr = pos(i,3)
-      EE = EE + epsilon * ( 2.D0/15 * ( sigma / rr )**9 &
-                            - ( sigma / rr )**3 )
-    elseif ( pos(i,3) <Lz .and. pos(i,3) > (Lz - 0.86) ) then
-      rr = Lz-pos(i,3)
-      EE = EE + epsilon * ( 2.D0/15 * ( sigma / rr )**9 &
-                            - ( sigma / rr )**3 )
-    endif
-  end do
 end subroutine LJ_energy
 
 
@@ -199,7 +189,7 @@ subroutine FENE_energy(EE)
   integer :: i, j, k, l, m
   real*8  :: rij(3), rr
 
-  do i = 1, Npe
+  do i = 1, NN
     if ( i == 1 ) then
       k = 1
       l = fene_point(1)
@@ -210,7 +200,7 @@ subroutine FENE_energy(EE)
     do m = k, l
       j = fene_list(m)
       call rij_and_rr( rij, rr, i, j)
-      EE = EE - 1.D0/2 * kFENE * R0_2 * log( 1 - rr/R0_2 ) / 2
+      EE = EE + 1.D0/2 * Kvib * (sqrt(rr)-1) * (sqrt(rr)-1)
     end do
   end do
 
@@ -267,9 +257,7 @@ subroutine Delta_Energy(DeltaE)
   call Delta_LJ_Energy(DeltaE)
   !
   !Compute Delta energy of FENE potential
-  if ( ip <= Npe ) then
-    call Delta_FENE_Energy(DeltaE)
-  end if
+  call Delta_FENE_Energy(DeltaE)
 
 end subroutine Delta_Energy
 
@@ -384,9 +372,8 @@ subroutine Delta_FENE_Energy(DeltaE)
   implicit none
   real*8, intent(inout) :: DeltaE
   integer :: i, j, k, l, m
-  real*8  :: rr, rij(3), EE
+  real*8  :: rr, rij(3)
 
-  EE=0
   !
   !ip can't be 1 because it can't 
   !be the anchored particles.
@@ -406,7 +393,7 @@ subroutine Delta_FENE_Energy(DeltaE)
     !Peridoic condition
     call periodic_condition(rij)
     rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
-    EE = EE - 0.5 * Kvib * (rr-1) * (rr-1)
+    DeltaE = DeltaE - 0.5 * Kvib * (rr-1) * (rr-1)
     !
     !Energy of FENE potential of new configuration
     !
@@ -419,9 +406,8 @@ subroutine Delta_FENE_Energy(DeltaE)
       write(*,*) 'Chemical bonds are Broken off!'
       stop
     end if
-    EE = EE + 0.5 * Kvib * (rr-1) * (rr-1)
+    DeltaE = DeltaE + 0.5 * Kvib * (rr-1) * (rr-1)
   enddo
-  DeltaE = DeltaE + 0.5D0 * KFENE * R0_2 * EE
 
 end subroutine Delta_FENE_Energy
 
@@ -452,7 +438,7 @@ subroutine initialize_lj_parameters
   !--------------------------------------!
   use global_variables
   implicit none
-  real*8 :: rho, v_verlet
+  real*8 :: v_verlet
   !
   !allocate verlet list of LJ potential
   if ( allocated(lj_point) ) deallocate(lj_point)

@@ -47,8 +47,8 @@ end subroutine initialize_parameters
 
 
 subroutine read_data
-  implicit none
   use global_variables
+  implicit none
 
   open(unit=100, file='system_data.txt')
     read(100,*) rho

@@ -43,14 +43,15 @@ module global_variables
 
 !##########################arrays##########################!
  real*8, allocatable, dimension(:,:) :: pos     !old position array
- real*8, allocatable, dimension(4)   :: pos_ip0
- real*8, allocatable, dimension(4)   :: pos_ip1
+ real*8,  dimension(4)   :: pos_ip0
+ real*8,  dimension(4)   :: pos_ip1
 !real*8, allocatable, dimension(:,:) :: pos_ip0 !old position of part of chains
 !real*8, allocatable, dimension(:,:) :: pos_ip1 !new position of part of chains
  integer :: ip                                  !The chain that is choosed
- integer :: im                                  !The monomer that is choosed
+!  integer :: im                                  !The monomer that is choosed
 !########################end arrays########################!
 
+  contains 
 
 subroutine periodic_condition(rr)
   !--------------------------------------!
@@ -65,7 +66,6 @@ subroutine periodic_condition(rr)
   !Routine Referenced:
   !1.
   !--------------------------------------!
-  use global_variables
   implicit none
   real*8, intent(inout) :: rr(3)
 
@@ -81,7 +81,7 @@ subroutine periodic_condition(rr)
   end if
   if ( rr(3) > Lz/2 ) then
     rr(3) = rr(3) - Lz
-  elseif( rr(3)) <= -Lz/2 ) then
+  elseif( rr(3) <= -Lz/2 ) then
     rr(3) = rr(3) + Lz
   end if
 
@@ -101,7 +101,6 @@ subroutine rij_and_rr(rij, rsqr, i, j)
   !note:
   !  including period condition
   !-----------------------------------------!
-  use global_variables
   implicit none
   real*8, dimension(3), intent(out) :: rij
   real*8, intent(out) :: rsqr
@@ -121,10 +120,10 @@ subroutine rij_and_rr(rij, rsqr, i, j)
   elseif( rij(2) <= -Ly/2 ) then
     rij(2) = rij(2) + Ly
   end if
-  if ( rr(3) > Lz/2 ) then
-    rr(3) = rr(3) - Lz
-  elseif( rr(3)) <= -Lz/2 ) then
-    rr(3) = rr(3) + Lz
+  if ( rij(3) > Lz/2 ) then
+    rij(3) = rij(3) - Lz
+  elseif( rij(3) <= -Lz/2 ) then
+    rij(3) = rij(3) + Lz
   end if
 
   rsqr = rij(1)*rij(1) + rij(2)*rij(2) + rij(3)*rij(3)

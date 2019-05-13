@@ -26,8 +26,7 @@ subroutine Initialize_position
   !--------------------------------------!
   use global_variables
   implicit none
-  integer :: i, j, k, m, n, x, y, p
-  integer, intent(inout) :: l
+  integer :: i, j, k, l, m, n, x, y, p
   real*8 :: theta, rnd1, rnd2, rnd3, rsqr
   real*8, dimension(3) :: rij
 
@@ -56,7 +55,7 @@ subroutine Initialize_position
         pos(l,2)=pos(l-1,2)+R_bond*sin(pi*rnd1)*sin(2*pi*rnd2)
         pos(l,3)=pos(l-1,3)+R_bond*cos(pi*rnd1)
         !periodic condition
-        call period_condition_rij(pos(l,1:3))
+        call periodic_condition(pos(l,1:3))
         !
         !Judge whether the particle is close the former paritcle
         !too much.
@@ -218,12 +217,6 @@ subroutine choose_particle
 
   call random_number(rnd)
   ip = int(rnd*NN) + 1
-  !
-  !The monomer anchored on the plate can't move, so we need to choose again.
-  do while( mod(ip,Nml) == 1 .and. ip <= Npe )
-    call random_number(rnd)
-    ip = int(rnd*NN) + 1
-  end do
 
 end subroutine choose_particle
 
@@ -248,8 +241,7 @@ subroutine New_Position
   pos_ip0 = pos(ip,:)
   call random_number(rnd)
   pos_ip1(1:3) = pos_ip0(1:3) + (rnd - 0.5D0) * dr
-  pos_ip1(4)   = pos_ip0(4)
-  call periodic_condition( pos_ip1(1:2) )
+  call periodic_condition( pos_ip1 )
 
 end subroutine New_Position
 
