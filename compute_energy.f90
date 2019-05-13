@@ -19,11 +19,10 @@ module compute_energy
   real*8,  private :: rv_lj       !Verlet list radius of LJ potential
   real*8,  private :: rsk_lj      !Skin between cut off sphere and verlet list 
                                   !sphere
-  integer, private :: npair1      !number of pairs in the lj verlet sphere
 !
 !fene potential
   real*8,  private :: R0_2        !Max bond length R0 square in FENE potential
-  real*8,  private :: kFENE       !FENE spring constant k
+  real*8,  private :: Kvib        !FENE spring constant k
   integer, private :: N_bond      !Number of Chemical bond of polymers
 !##########end coefficient in potential function###########!
 
@@ -65,21 +64,17 @@ subroutine initialize_energy_parameters
   use global_variables
   implicit none
   !
-  !read energy parameters from file
-  call read_energy_parameters
-  !
   !Initialize lj parameters and array allocate.
-  !
   call initialize_lj_parameters
   !
   !build lj_pair_list and lj_point
   call build_lj_verlet_list
   !
+  !read energy parameters from file
+  call read_energy_parameters
+  !
   !Initialize fene parameters and array allocate.
   call build_fene_list
-  !
-  !write energy parameters
-  call write_energy_parameters
 
 end subroutine initialize_energy_parameters
 
@@ -242,10 +237,6 @@ subroutine update_verlet_list
     call build_lj_verlet_list
   end if
 
-  if ( mod(step, nint(rsk_real/dr)*2) == 0 .and. real_verlet == 1) then
-    call build_real_verlet_list
-  end if
-
 end subroutine update_verlet_list
 
 
@@ -281,46 +272,6 @@ subroutine Delta_Energy(DeltaE)
   end if
 
 end subroutine Delta_Energy
-
-
-subroutine Delta_Energy_time( DeltaE, time )
-  !--------------------------------------!
-  !Compute change of energy.
-  !   
-  !Input
-  !   
-  !Output
-  !   DeltaE
-  !External Variables
-  !   pos_ip0, pos_ip1, ip
-  !   inv_charge, DeltaE, EF
-  !Routine Referenced:
-  !1.Delta_LJ_Energy(DeltaE)
-  !2.Delta_FENE_Energy(DeltaE)
-  !3.Delta_real_Energy(DeltaE)
-  !4.Delta_Reciprocal_Energy(DeltaE)
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  real*8, intent(out) :: DeltaE
-  real*8, dimension(3), intent(inout) :: time
-  real*8 :: st_lj, fn_lj, st_real, fn_real
-  real*8 :: st_Fourier, fn_Fourier
-
-  DeltaE = 0
-  !
-  !Compute energy of LJ potential
-  call cpu_time(st_lj)
-  call Delta_LJ_Energy(DeltaE)
-  call cpu_time(fn_lj)
-  time(1) = time(1) + fn_lj - st_lj
-  !
-  !Compute Delta energy of FENE potential
-  if ( ip <= Npe ) then
-    call Delta_FENE_Energy(DeltaE)
-  end if
-
-end subroutine Delta_Energy_time
 
 
 subroutine Delta_lj_Energy(DeltaE)
@@ -359,7 +310,7 @@ subroutine Delta_lj_Energy(DeltaE)
   nh_lx  = - h_lx
   nh_ly  = - h_ly
   sigma2 = sigma * sigma
-  rc_lj2 = rc_lj *rc_lj
+  rc_lj2 = rc_lj * rc_lj
   !
   !ip can't be 1 because it can't 
   !be the anchored particles.
@@ -373,16 +324,7 @@ subroutine Delta_lj_Energy(DeltaE)
     rij = pos(i, 1:3) - pos_ip0(1:3)
     !
     !periodic condition
-    if ( rij(1) > h_lx ) then
-      rij(1) = rij(1) - Lx
-    elseif ( rij(1) < nh_lx ) then
-      rij(1) = rij(1) + Lx
-    end if
-    if ( rij(2) > h_ly ) then
-      rij(2) = rij(2) - Ly
-    elseif ( rij(2) < nh_ly ) then
-      rij(2) = rij(2) + Ly
-    end if
+    call periodic_condition(rij)
     !
     !lj energy
     rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
@@ -398,16 +340,7 @@ subroutine Delta_lj_Energy(DeltaE)
     rij = pos(i, 1:3) - pos_ip1(1:3)
     !
     !periodic condition
-    if ( rij(1) > h_lx ) then
-      rij(1) = rij(1) - Lx
-    elseif ( rij(1) < nh_lx ) then
-      rij(1) = rij(1) + Lx
-    end if
-    if ( rij(2) > h_ly ) then
-      rij(2) = rij(2) - Ly
-    elseif ( rij(2) < nh_ly ) then
-      rij(2) = rij(2) + Ly
-    end if
+    call periodic_condition(rij)
     !
     !lj energy
     rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
@@ -420,30 +353,6 @@ subroutine Delta_lj_Energy(DeltaE)
   end do
 
   DeltaE = DeltaE + 4 * epsilon * EE
-
-  !
-  !Energy of particle and wall of old configuration
-  !0.4^(1/6) = 0.86
-  if ( pos_ip0(3) < 0.86 ) then
-    rr = pos_ip0(3)
-    DeltaE = DeltaE - epsilon * ( 2.D0/15 * ( sigma / rr )**9 &
-                            - ( sigma / rr )**3 )
-  elseif ( pos_ip0(3) > (Lz - 0.86) ) then
-    rr = Lz-pos_ip0(3)
-    DeltaE = DeltaE - epsilon * ( 2.D0/15 * ( sigma / rr )**9 &
-                            - ( sigma / rr )**3 )
-  end if
-  !
-  !Energy of particle and wall of new configuration
-  if ( pos_ip1(3) < 0.86 ) then
-    rr = pos_ip1(3)
-    DeltaE = DeltaE + epsilon * ( 2.D0/15 * ( sigma / rr )**9 &
-                            - ( sigma / rr )**3 )
-  elseif ( pos_ip1(3) > (Lz - 0.86) ) then
-    rr = Lz-pos_ip1(3)
-    DeltaE = DeltaE + epsilon * ( 2.D0/15 * ( sigma / rr )**9 &
-                            - ( sigma / rr )**3 )
-  end if
 
 end subroutine Delta_lj_Energy
 
@@ -495,40 +404,22 @@ subroutine Delta_FENE_Energy(DeltaE)
     rij = pos(i,1:3) - pos_ip0(1:3)
     !
     !Peridoic condition
-    if ( rij(1) > Lx/2 ) then
-      rij(1) = rij(1) - Lx
-    elseif ( rij(1) < -Lx/2 ) then
-      rij(1) = rij(1) + Lx
-    end if
-    if ( rij(2) > Ly/2 ) then
-      rij(2) = rij(2) - Ly
-    elseif ( rij(2) < -Ly/2 ) then
-      rij(2) = rij(2) + Ly
-    end if
-    rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
-    EE = EE + log( 1 - rr / R0_2 )
+    call periodic_condition(rij)
+    rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
+    EE = EE - 0.5 * Kvib * (rr-1) * (rr-1)
     !
     !Energy of FENE potential of new configuration
     !
     rij = pos(i,1:3) - pos_ip1(1:3)
     !
     !Periodic condition
-    if ( rij(1) > Lx/2 ) then
-      rij(1) = rij(1) - Lx
-    elseif ( rij(1) < -Lx/2 ) then
-      rij(1) = rij(1) + Lx
-    end if
-    if ( rij(2) > Ly/2 ) then
-      rij(2) = rij(2) - Ly
-    elseif ( rij(2) < -Ly/2 ) then
-      rij(2) = rij(2) + Ly
-    end if
-    rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
+    call periodic_condition(rij)
+    rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
     if ( rr > R0_2 ) then
       write(*,*) 'Chemical bonds are Broken off!'
       stop
     end if
-    EE = EE - log( 1 - rr / R0_2 )
+    EE = EE + 0.5 * Kvib * (rr-1) * (rr-1)
   enddo
   DeltaE = DeltaE + 0.5D0 * KFENE * R0_2 * EE
 
@@ -549,25 +440,10 @@ subroutine read_energy_parameters
     read(100,*) rv_lj
     read(100,*) rsk_lj
     read(100,*) R0_2
-    read(100,*) kFENE
+    read(100,*) Kvib
   close(100)
 
 end subroutine read_energy_parameters
-
-
-subroutine write_energy_parameters
-  !--------------------------------------!
-  !
-  !--------------------------------------!
-  use global_variables
-  implicit none
-
-  write(*,*) '******************  Potential  *********************'
-  write(*,*) 'rc_lj      :', rc_lj
-  write(*,*) 'rv_lj      :', rv_lj
-  write(*,*) '****************************************************'
-
-end subroutine write_energy_parameters
 
 
 subroutine initialize_lj_parameters
@@ -577,13 +453,11 @@ subroutine initialize_lj_parameters
   use global_variables
   implicit none
   real*8 :: rho, v_verlet
-
   !
   !allocate verlet list of LJ potential
   if ( allocated(lj_point) ) deallocate(lj_point)
   allocate(  lj_point(NN)  )
   lj_point   = 0
-  rho = NN / (Lx * Ly * Lz)
   v_verlet = 8.D0/3 * pi * rv_lj**3
   if ( allocated(lj_pair_list) ) deallocate(lj_pair_list)
   allocate(  lj_pair_list(25*NN*ceiling(rho*v_verlet))  )
@@ -631,7 +505,7 @@ subroutine build_lj_verlet_list
   do i=1,NN
     icel=int((pos(i,1)+Lx/2)/rcel1)
     jcel=int((pos(i,2)+Ly/2)/rcel2)
-    kcel=int(pos(i,3)/rcel3)
+    kcel=int((pos(i,3)+Lz/2)/rcel3)
     cell_list(i)=hoc(icel,jcel,kcel)
     hoc(icel,jcel,kcel)=i
   end do
@@ -640,7 +514,7 @@ subroutine build_lj_verlet_list
   do i=1,NN
     icel=int((pos(i,1)+Lx/2)/rcel1)  
     jcel=int((pos(i,2)+Ly/2)/rcel2)
-    kcel=int(pos(i,3)/rcel3)
+    kcel=int((pos(i,3)+Lz/2)/rcel3)
     do l=-1,1
       if (icel+l .ge. ncel1) then
         p=icel+l-ncel1
@@ -659,9 +533,9 @@ subroutine build_lj_verlet_list
         end if
         do n=-1,1
           if (kcel+n .ge. ncel3) then
-            cycle
+            r=kcel+n-ncel3
           elseif(kcel+n<0) then
-            cycle
+            r=kcel+n+ncel3
           else
             r=kcel+n
           end if
@@ -690,111 +564,6 @@ subroutine build_lj_verlet_list
 end subroutine build_lj_verlet_list
 
 
-subroutine build_real_verlet_list
-  !--------------------------------------!
-  !Construct real_pair_list and real_point by the link list
-  !method with the complexity of O(N)
-  !   
-  !Input
-  !   pos
-  !Output
-  !   real_pair_list, real_point
-  !External Variables
-  !   Nq, Lx, Ly, Lz, rv_real,
-  !   real_pair_list, real_point, pos, charge
-  !Routine Referenced:
-  !1. rij_and_rr(rij, rr, i, j)
-  !Reference:
-  !Frenkel, Smit, 'Understanding molecular simulation: from
-  !algorithm to applications', Elsevier, 2002, pp.550-552. 
-  !--------------------------------------!
-  use global_variables
-  implicit none
-
-  integer i,j,k,m,n,p,q,r,u,v,w,maxnab
-  integer icel,jcel,kcel,ncel1,ncel2,ncel3
-  real*8, dimension(3) :: rij
-  real*8 :: rsqr,rcel1,rcel2,rcel3
-  integer, dimension(Nq) :: cell_list
-  integer,allocatable,dimension(:,:,:)::hoc
-  ncel1=int(Lx/rv_real)
-  ncel2=int(Ly/rv_real)
-  ncel3=int(Lz/rv_real)
-  allocate(hoc(0:ncel1-1,0:ncel2-1,0:ncel3-1))
-
-  hoc=0
-  maxnab=size(real_pair_list)
-  rcel1=Lx/ncel1
-  rcel2=Ly/ncel2
-  rcel3=Lz/ncel3
-  do m=1,Nq
-    i=charge(m)
-    icel=int((pos(i,1)+Lx/2)/rcel1)
-    jcel=int((pos(i,2)+Ly/2)/rcel2)
-    kcel=int(pos(i,3)/rcel3)
-    cell_list(m)=hoc(icel,jcel,kcel)
-    hoc(icel,jcel,kcel)=m
-  end do
-
-  k=0
-  do m=1,Nq
-    i=charge(m)
-    icel=int((pos(i,1)+Lx/2)/rcel1)
-    jcel=int((pos(i,2)+Ly/2)/rcel2)
-    kcel=int(pos(i,3)/rcel3)
-    do u=-1,1
-      if (icel+u>=ncel1) then
-        p=icel+u-ncel1
-      elseif(icel+u<0) then
-        p=icel+u+ncel1
-      else
-        p=icel+u
-      end if
-      do v=-1,1
-        if (jcel+v>=ncel2) then
-          q=jcel+v-ncel2
-        elseif(jcel+v<0) then
-          q=jcel+v+ncel2
-        else
-          q=jcel+v
-        end if
-        do w=-1,1
-          if (kcel+w>=ncel3) then
-            cycle
-          elseif(kcel+w<0) then
-            cycle
-          else
-            r=kcel+w
-          end if
-          n=hoc(p,q,r)
-          do while (n /= 0)
-            j=charge(n)
-            call rij_and_rr(rij,rsqr,i,j)
-            if ( i/=j .and. rsqr<(rv_real*rv_real) ) then
-              k=k+1
-              if ( k > maxnab ) then
-                write(*,*) 'maxnab', maxnab
-                write(*,*) 'k',  k
-                write(*,*) 'real verlet list is too small!'
-                stop
-              end if
-!               real_pair_list(k,1)=i
-!               real_pair_list(k,2)=j
-              real_pair_list(k) = j
-            end if
-            n = cell_list(n)
-          end do
-        end do
-      end do
-    end do
-    real_point(m) = k
-  end do
-  npair2 = k
-  deallocate(hoc)
-
-end subroutine build_real_verlet_list
-
-
 subroutine build_fene_list
   !--------------------------------------!
   !Construct the fene_list array.
@@ -812,10 +581,10 @@ subroutine build_fene_list
 
   N_bond = Ngl * (Nml-1) * 2
   allocate( fene_list(N_bond) )
-  allocate( fene_point(Npe) )
+  allocate( fene_point(NN) )
 
   l = 0
-  do i = 1, Npe
+  do i = 1, NN
     if ( mod( i, Nml ) == 1 ) then
       l = l + 1
       fene_list(l)  = i + 1 
@@ -834,43 +603,6 @@ subroutine build_fene_list
   end do
 
 end subroutine build_fene_list
-
-
-subroutine rij_and_rr(rij, rsqr, i, j)
-  !-----------------------------------------!
-  !compute displacement vector and displacement of two particles
-  !input:
-  !  post(pos or pos1), i, j(particle number) 
-  !output:
-  !  rij(displacement vecter), rr(square of displacement)
-  !External Variant:
-  !  Lz(used in period condition)
-  !note:
-  !  including period condition
-  !-----------------------------------------!
-  use global_variables
-  implicit none
-  real*8, dimension(3), intent(out) :: rij
-  real*8, intent(out) :: rsqr
-  integer, intent(in) :: i
-  integer, intent(in) :: j
-
-  rij = pos(i,1:3) - pos(j,1:3)
-
-  if ( rij(1) > Lx/2 ) then
-    rij(1) = rij(1) - Lx
-  elseif( rij(1) <= -Lx/2 ) then
-    rij(1) = rij(1) + Lx
-  end if
-  if ( rij(2) > Ly/2 ) then
-    rij(2) = rij(2) - Ly
-  elseif( rij(2) <= -Ly/2 ) then
-    rij(2) = rij(2) + Ly
-  end if
-
-  rsqr = rij(1)*rij(1) + rij(2)*rij(2) + rij(3)*rij(3)
-
-end subroutine rij_and_rr
 
 
 end module compute_energy

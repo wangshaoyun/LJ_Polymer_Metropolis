@@ -7,8 +7,11 @@ implicit none
 
 !##########Data Dictionary############!
   integer :: i, j, k
-  real*8  :: EE, EE1=0, st, fn
-  real*8  :: DeltaE, time(3)
+  real*8  :: EE        ! Total Energy before move
+  real*8  :: EE1       ! Total Energy after move
+  real*8  :: DeltaE    ! Energy difference
+  !   real*8  :: wn        ! Rosenbluth factor of new configuration
+  !   real*8  :: wo        ! Rosenbluth factor of old configuration
 !#####################################!
 
 !#############Initialize##############!
@@ -25,15 +28,9 @@ implicit none
     call Initialize_position
     call write_pos
     call write_pos1(1)
-    call write_hist
     !
     !initialize energy and parameters of potential
     call initialize_energy_parameters
-    !
-    !Error analysis of Ewald sum
-    if ( qq /= 0 ) then
-      call error_analysis
-    end if
     !
     !Compute total energy
     call total_energy(EE)
@@ -46,73 +43,51 @@ implicit none
     !initialize energy and parameters of potential
     call initialize_energy_parameters
     !
-    !Error analysis of Ewald sum
-    if ( qq /= 0 ) then
-      call error_analysis
-    end if
-    !
     !Compute total energy
     call total_energy(EE)
   end if
 !#####################################!
 
-call Monte_Carlo_Move_and_Time(EE, DeltaE, time)
-write(*,*) 'time in lj            :', time(1)
-write(*,*) 'time in real space    :', time(2)
-write(*,*) 'time in fourier space :', time(3)
 
 !##############Preheation#############!
- if ( i <= StepNum0 ) then
-  do step = i, StepNum0
-    if ( mod(step,DeltaStep1) == 0 ) then
-      call Monte_Carlo_Move_and_Time(EE, DeltaE, time)
-      call compute_physical_quantities
-      call total_energy(EE1)
-      call write_physical_quantities( step, EE, EE1, DeltaE, time )
-!       EE = EE1
-      write(*,*) 'time in lj            :', time(1)
-      write(*,*) 'time in real space    :', time(2)
-      write(*,*) 'time in fourier space :', time(3)
-    else
+  if ( i <= StepNum0 ) then
+    do step = i, StepNum0
       call Monte_Carlo_Move(EE, DeltaE)
-    end if    
-    call update_verlet_list
-    if ( mod(step,DeltaStep3) == 0 ) then
-      call write_pos1(step)
-      if ( qq /= 0 ) then
-        call error_analysis
+      if ( mod(step,DeltaStep1) == 0 ) then
+        call compute_physical_quantities
+        call total_energy(EE1)
+        call write_physical_quantities( step, EE, EE1, DeltaE )
+      end if    
+      call update_verlet_list
+      if ( mod(step,DeltaStep2) == 0 ) then
+        call write_pos1(step)
       end if
-    end if
-  end do
-  i = step
-end if
+    end do
+    i = step
+  end if
 !#####################################!
 
 !###############Running###############!
   do step=i, StepNum+StepNum0
+    call Monte_Carlo_Move(EE, DeltaE)
     if ( mod(step,DeltaStep1) == 0 ) then 
-      call Monte_Carlo_Move_and_Time(EE, DeltaE, time)
       call compute_physical_quantities
       call total_energy(EE1)
-      call write_physical_quantities( step, EE, EE1, DeltaE, time )
-    else
-      call Monte_Carlo_Move(EE, DeltaE)
+      call write_physical_quantities( step, EE, EE1, DeltaE )
     end if
     call update_verlet_list
     if ( mod(step, DeltaStep2) == 0 ) then
-      call histogram
-    end if
-    if ( mod(step, DeltaStep3) == 0 ) then
       call write_pos1(step)
-      call write_hist
     end if
   end do
 !#####################################!
 
+!###############Finished##############!
   call cpu_time(finished)
   total_time=finished-started+total_time
   call write_time(total_time)
   write(*,*) 'finished!'
+!#####################################!
 
 end program main
 

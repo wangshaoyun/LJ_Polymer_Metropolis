@@ -9,15 +9,14 @@ module global_variables
 !########################constants#########################!
 
 !####################systems coefficient###################!
-  integer :: Ngl      !Number of linear chains grafted on plate
-  integer :: Nx       !Chains in x direction
-  integer :: Ny       !Chains in y direction
+  integer :: Ngl      !Number of linear chains
   integer :: Nml      !Number of monomers in each chain
   integer :: NN       !Total particles in the system
-  real*8  :: rho      !Polymer density 
+  real*8  :: rho      !Polymer monomer number density 
   real*8  :: Lx       !Length of cell in x direction
   real*8  :: Ly       !Length of cell in y direction
-  real*8  :: Lz       !Distance of two plate
+  real*8  :: Lz       !Length of cell in z direction
+  real*8  :: R_bond   !Initial bond length of polymers
   real*8  :: Beta     !Beta=1/(kB*T), T is temperature, 
                       !kB is Boltzmann constant
 !##################end systems coefficient#################!
@@ -25,14 +24,13 @@ module global_variables
 
 !##################running and Histogram###################!
   integer :: restart_or_continue  !restart or continue after breaking off 
-  integer :: random_or_uniform
   integer :: StepNum0             !steps of preheating
   integer :: StepNum              !steps of running
   integer :: DeltaStep1           !step inteval, physical quantities
-  integer :: DeltaStep2           !step inteval, histogram
-  integer :: DeltaStep3           !step inteval, write data
+  integer :: DeltaStep2           !step inteval, write data
   integer :: step                 !steps of calculate the physical quantities
   real*8  :: dr                   !length of each moving
+  real*8  :: std                  !std of regrow bonds
 !
 !timing
   real*8  :: started    = 0       !time at starting
@@ -44,10 +42,13 @@ module global_variables
 !################end running and Histogram#################!
 
 !##########################arrays##########################!
- real*8, allocatable, dimension(:,:) :: pos       !old position array
- real*8, dimension(4) :: pos_ip0                  !old position of ip
- real*8, dimension(4) :: pos_ip1                  !new position of ip
- integer :: ip                                    !The particle that is choosed
+ real*8, allocatable, dimension(:,:) :: pos     !old position array
+ real*8, allocatable, dimension(4)   :: pos_ip0
+ real*8, allocatable, dimension(4)   :: pos_ip1
+!real*8, allocatable, dimension(:,:) :: pos_ip0 !old position of part of chains
+!real*8, allocatable, dimension(:,:) :: pos_ip1 !new position of part of chains
+ integer :: ip                                  !The chain that is choosed
+ integer :: im                                  !The monomer that is choosed
 !########################end arrays########################!
 
 
