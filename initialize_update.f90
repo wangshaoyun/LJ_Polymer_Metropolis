@@ -32,12 +32,12 @@ subroutine Initialize_position
 
 
   do i=1, Ngl
-    l = (i-1)*Ngl + 1
+    l = (i-1)*Nml + 1
     x=(i-1)/nint(sqrt(Ngl*1.))+1
     y=mod(i-1,nint(sqrt(Ngl*1.)))+1
     pos(l,1)=Lx/nint(sqrt(Ngl*1.))*(x-0.5)-Lx/2
     pos(l,2)=Ly/nint(sqrt(Ngl*1.))*(y-0.5)-Ly/2
-    pos(l,3)=Lz/nint(sqrt(Ngl*1.))-Lz/2
+    pos(l,3)=Lz/nint(sqrt(Ngl*1.))*0.5-Lz/2
     do k=2, Nml
       l=l+1
       m=1
@@ -46,7 +46,7 @@ subroutine Initialize_position
         m=0
         call random_number(rnd1)
         if (p<10) then
-          rnd1=rnd1/5
+          rnd1=rnd1/2
         else
           rnd1=rnd1**2
         end if
@@ -61,7 +61,7 @@ subroutine Initialize_position
         !too much.
         do n=1,l-1
           call rij_and_rr(rij,rsqr,n,l)
-          if (rsqr<0.7 .or. pos(l,3)<1) then
+          if (rsqr<0.9 .or. pos(l,3)<(-Lz/2+1) ) then
             m=1
             p=p+1
             cycle
@@ -181,18 +181,17 @@ subroutine Monte_Carlo_Move( EE, DeltaE )
   integer :: j
   real*8 :: EE1, EE2
 
-  do j = 1, NN-Ngl
-!     call total_energy(EE1)
+  do j = 1, NN
+  !     call total_energy(EE1)
 
     call Choose_Particle
     call New_Position
     call Delta_Energy(DeltaE)
     call Move_or_not(EE, DeltaE)
-
     !
     !test EE2-EE1 = DeltaE
-    ! call total_energy(EE2)
-    ! write(*,*) EE2 - EE1, DeltaE, EE2, EE1  
+  !     call total_energy(EE2)
+  !     write(*,*) EE2 - EE1, DeltaE, EE2, EE1  
   end do
 
 end subroutine Monte_Carlo_Move
@@ -272,14 +271,47 @@ subroutine Move_or_not(EE, DeltaE)
   if ( DeltaE < 0 ) then
     pos(ip,1:3) = pos(ip,1:3) + pos_ip1(1:3) - pos_ip0(1:3)
     EE = EE + DeltaE
+    accpt_num = accpt_num + 1
   else 
     call random_number(rnd)
     if ( rnd < Exp(-Beta*DeltaE) ) then
       pos(ip,1:3) = pos(ip,1:3) + pos_ip1(1:3) - pos_ip0(1:3)
       EE = EE + DeltaE
+      accpt_num = accpt_num + 1
     endif
   endif
+  total_num = total_num + 1
 end subroutine Move_or_not
+
+
+subroutine adjust_move_distance
+  !--------------------------------------!
+  !
+  !   
+  !Input
+  !   
+  !Output
+  !   
+  !External Variables
+  !   pos, pos_ip0, pos_ip1, ip, Beta
+  !Routine Referenced:
+  !1.
+  !Reference:
+  !
+  !--------------------------------------!
+  use global_variables
+  implicit none
+  real*8 :: delta_accpt_ratio
+
+  accpt_ratio = accpt_num / total_num
+  delta_accpt_ratio = accpt_ratio - best_accpt_ratio 
+  dr = dr + delta_dr * delta_accpt_ratio / abs(delta_accpt_ratio)
+
+  accpt_num = 0
+  total_num = 0
+
+end subroutine adjust_move_distance
+
 
 end module initialize_update
 

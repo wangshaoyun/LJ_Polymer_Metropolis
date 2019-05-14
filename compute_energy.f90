@@ -65,14 +65,14 @@ subroutine initialize_energy_parameters
   use global_variables
   implicit none
   !
+  !read energy parameters from file
+  call read_energy_parameters
+  !
   !Initialize lj parameters and array allocate.
   call initialize_lj_parameters
   !
   !build lj_pair_list and lj_point
   call build_lj_verlet_list
-  !
-  !read energy parameters from file
-  call read_energy_parameters
   !
   !Initialize fene parameters and array allocate.
   call build_fene_list
@@ -154,6 +154,7 @@ subroutine LJ_energy (EE)
         inv_rr2  = sigma*sigma/rr
         inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
         EE = EE + 4 * epsilon * ( inv_rr6 * inv_rr6 - inv_rr6 + 0.25D0) / 2
+        ! ! ! must divided by 2 because of the repeating cycle
       end if
     end do
   end do
@@ -200,7 +201,8 @@ subroutine FENE_energy(EE)
     do m = k, l
       j = fene_list(m)
       call rij_and_rr( rij, rr, i, j)
-      EE = EE + 1.D0/2 * Kvib * (sqrt(rr)-1) * (sqrt(rr)-1)
+      EE = EE + 0.5 * Kvib * (sqrt(rr)-1) * (sqrt(rr)-1) / 2
+      ! ! ! must divided by 2
     end do
   end do
 
@@ -288,22 +290,21 @@ subroutine Delta_lj_Energy(DeltaE)
   use global_variables
   implicit none
   real*8, intent(inout) :: DeltaE
-  real*8  :: EE, h_lx, h_ly, nh_lx, nh_ly, sigma2, rc_lj2
+  real*8  :: EE, sigma2, rc_lj2
   real*8  :: rij(3), rr, inv_rr2, inv_rr6, inv_rr12
   integer :: i, j, k, l
 
   EE     = 0
-  h_lx   = Lx / 2
-  h_ly   = Ly / 2
-  nh_lx  = - h_lx
-  nh_ly  = - h_ly
   sigma2 = sigma * sigma
   rc_lj2 = rc_lj * rc_lj
-  !
-  !ip can't be 1 because it can't 
-  !be the anchored particles.
-  k = lj_point( ip-1 ) + 1
-  l = lj_point( ip )
+  if (ip==1) then
+    k = 1
+    l = lj_point( ip )
+  else
+    k = lj_point( ip-1 ) + 1
+    l = lj_point( ip )
+  end if
+
   do j= k, l
     i = lj_pair_list(j)
     !
@@ -374,17 +375,15 @@ subroutine Delta_FENE_Energy(DeltaE)
   integer :: i, j, k, l, m
   real*8  :: rr, rij(3)
 
-  !
-  !ip can't be 1 because it can't 
-  !be the anchored particles.
-  l = fene_point(ip-1)+1
-  m = fene_point(ip)
+  if (ip==1) then
+    l = 1
+    m = fene_point(ip)
+  else 
+    l = fene_point(ip-1)+1
+    m = fene_point(ip)
+  end if
   do k= l, m
     i = fene_list(k)
-    if (i==ip) then
-      write(*,*) i
-      stop 
-    end if
     !
     !Energy of FENE potential of odd configuration
     !
@@ -402,10 +401,10 @@ subroutine Delta_FENE_Energy(DeltaE)
     !Periodic condition
     call periodic_condition(rij)
     rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
-    if ( rr > R0_2 ) then
-      write(*,*) 'Chemical bonds are Broken off!'
-      stop
-    end if
+!     if ( rr > R0_2 ) then
+!       write(*,*) 'Chemical bonds are Broken off!'
+!       stop
+!     end if
     DeltaE = DeltaE + 0.5 * Kvib * (rr-1) * (rr-1)
   enddo
 
@@ -446,7 +445,7 @@ subroutine initialize_lj_parameters
   lj_point   = 0
   v_verlet = 8.D0/3 * pi * rv_lj**3
   if ( allocated(lj_pair_list) ) deallocate(lj_pair_list)
-  allocate(  lj_pair_list(25*NN*ceiling(rho*v_verlet))  )
+  allocate(  lj_pair_list(100*NN*ceiling(rho*v_verlet))  )
   lj_pair_list = 0
 
 end subroutine initialize_lj_parameters
@@ -589,6 +588,59 @@ subroutine build_fene_list
   end do
 
 end subroutine build_fene_list
+
+
+subroutine compute_pressure (pressure)
+  !----------------------------------------!
+  !input:
+  !  pos
+  !output:
+  !  pressure
+  !External Variables:
+  !  Ngl, Nml, Npe, NN,
+  !Reference:
+  !Frenkel, Smit, 'Understanding molecular simulation: from
+  !algorithm to applications', Elsevier, 2002, pp.52, Eq. (3.4.1).
+  !----------------------------------------!
+  use global_variables
+  implicit none
+  real*8, intent(out) :: pressure
+  integer i,j,k
+  real*8 :: rr, vir, inv_r2, inv_r6, rc_lj2
+  real*8, dimension(3) :: rij, fij
+
+  vir = 0
+  rc_lj2 = rc_lj * rc_lj
+  do i = 1, NN
+    do j = i+1, NN
+      call rij_and_rr(rij, rr, i, j)
+      if (rr<rc_lj2) then
+        inv_r2 = sigma*sigma / rr
+        inv_r6 = inv_r2*inv_r2*inv_r2
+        fij = 48 * epsilon * inv_r2 * inv_r6 * (inv_r6-0.5) * rij
+        vir = vir + dot_product(fij,rij)/3
+      end if
+    end do 
+    if ( mod(i,Nml)==1 ) then
+      call rij_and_rr(rij, rr, i, i+1)
+      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
+      vir = vir + dot_product(fij,rij)/3/2
+    elseif ( mod(i,Nml)==0 ) then
+      call rij_and_rr(rij, rr, i, i-1)
+      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
+      vir = vir + dot_product(fij,rij)/3/2
+    else
+      call rij_and_rr(rij, rr, i, i+1)
+      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
+      vir = vir + dot_product(fij,rij)/3/2
+      call rij_and_rr(rij, rr, i, i-1)
+      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
+      vir = vir + dot_product(fij,rij)/3/2
+    end if
+  end do
+  pressure = rho / Beta + vir / (Lx*Ly*Lz)
+
+end subroutine compute_pressure
 
 
 end module compute_energy

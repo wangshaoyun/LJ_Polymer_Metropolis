@@ -31,13 +31,18 @@ module global_variables
   integer :: step                 !steps of calculate the physical quantities
   real*8  :: dr                   !length of each moving
   real*8  :: std                  !std of regrow bonds
-!
-!timing
+  real*8  :: total_num = 0        !Total choose number
+  real*8  :: accpt_num = 0        !accepted number
+  real*8  :: accpt_ratio          !accepted ratio
+  real*8  :: best_accpt_ratio     !best accepted ratio
+  real*8  :: delta_dr             !adjust move distance
+  !
+  !timing
   real*8  :: started    = 0       !time at starting
   real*8  :: finished   = 0       !time at finishing
   real*8  :: total_time = 0       !total time of the simulation
-!
-!histogram
+  !
+  !histogram
   integer :: SizeHist             !number of histogram which is equally divided
 !################end running and Histogram#################!
 

@@ -16,17 +16,17 @@ initialize_update.o initialize_update.mod: compute_energy.mod global_variables.m
 	input_output.mod initialize_update.f90
 	
 	gfortran -g -c initialize_update.f90
+
+# .PHONY: input_output.o input_output.mod
+input_output.o input_output.mod: global_variables.mod compute_energy.mod input_output.f90
 	
+	gfortran -g -c input_output.f90
+		
 # .PHONY: compute_energy.o compute_energy.mod
-compute_energy.o compute_energy.mod: global_variables.mod input_output.mod compute_energy.f90
+compute_energy.o compute_energy.mod: global_variables.mod compute_energy.f90
 	
 	gfortran -g -c compute_energy.f90
 
-# .PHONY: input_output.o input_output.mod
-input_output.o input_output.mod: global_variables.mod input_output.f90
-	
-	gfortran -g -c input_output.f90
-	
 # .PHONY: global_variables.o global_variables.mod
 global_variables.o global_variables.mod: global_variables.f90
 	

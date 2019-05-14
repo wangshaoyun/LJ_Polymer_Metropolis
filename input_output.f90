@@ -61,6 +61,8 @@ subroutine read_data
     read(100,*) DeltaStep1
     read(100,*) DeltaStep2
     read(100,*) dr
+    read(100,*) best_accpt_ratio
+    read(100,*) delta_dr
   close(100)
 
 end subroutine read_data
@@ -110,11 +112,12 @@ subroutine continue_read_data(l)
   integer :: i, j 
 
   open(20,file='./data/pos1.txt')
-    read(20,*) ((pos(i,j),j=1,4),i=1,NN)
+    read(20,*) ((pos(i,j),j=1,3),i=1,NN)
   close(20)
   open(19,file='./start_time.txt')
     read(19,*)
     read(19,*) l
+    read(19,*) dr
     read(19,*) total_time
   close(19)
   
@@ -130,20 +133,32 @@ subroutine compute_physical_quantities
   !  pressure
   !External Variables:
   !  Ngl, Nml, Npe, NN,
+  !Reference:
+  !Frenkel, Smit, 'Understanding molecular simulation: from
+  !algorithm to applications', Elsevier, 2002, pp.52, Eq. (3.4.1).
   !----------------------------------------!
   use global_variables
+  use compute_energy
   implicit none
   integer i,j,k
-  real*8 :: rr, pressure
+  real*8 :: rr, pressure, Rg
   real*8, dimension(3) :: rij
   
+  Rg     = 0
+  do i = 1, NN-1
+    do j = i, NN
+        call rij_and_rr(rij, rr, j, k)
+        Rg  = Rg + rr
+    end do
+  end do
+  Rg     = Rg / NN / (NN-1)
   !
   !Calculate Pressure
-
+  call compute_pressure(pressure)
   !
   !Output Pressure
   open(37, position='append', file='./data/pressure.txt')
-    write(37,370) 1.*j, pressure, rho
+    write(37,370) 1.*j, Rg, pressure
     370 format(3F15.6)
   close(37)
   
@@ -187,14 +202,15 @@ subroutine write_pos1(j)
 
   open(30,file='./data/pos1.txt')
     do i=1, NN
-      write(30,300) pos(i,1), pos(i,2), pos(i,3), pos(i,4)
-      300 format(4F15.6)
+      write(30,300) pos(i,1), pos(i,2), pos(i,3)
+      300 format(3F15.6)
     end do
   close(30)
 
   open(32,file='./start_time.txt')
     write(32,*) 1
     write(32,*) j
+    write(32,*) dr
     call cpu_time(finished)
     total_time=total_time+finished-started
     call cpu_time(started)
@@ -211,19 +227,12 @@ subroutine write_physical_quantities(j, EE, EE1, DeltaE)
   use global_variables
   implicit none
   integer, intent(in) :: j
-  real*8, intent(in) :: EE
-  real*8, intent(in) :: EE1
-  real*8, intent(in) :: DeltaE
-  real*8 :: prob
-
-  if ( DeltaE < 0 ) then
-    prob = 1
-  else
-    prob = exp(-Beta*DeltaE)
-  end if 
+  real*8,  intent(in) :: EE
+  real*8,  intent(in) :: EE1
+  real*8,  intent(in) :: DeltaE
 
   open(37,position='append', file='./data/energy_and_time.txt')
-    write(37,370) 1.*j, EE, EE1, DeltaE, prob
+    write(37,370) 1.*j, EE, EE1, DeltaE, accpt_ratio
     370 format(5F15.6)
   close(37)
 

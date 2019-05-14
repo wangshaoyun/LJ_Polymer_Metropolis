@@ -57,7 +57,8 @@ implicit none
         call compute_physical_quantities
         call total_energy(EE1)
         call write_physical_quantities( step, EE, EE1, DeltaE )
-      end if    
+        call adjust_move_distance
+      end if
       call update_verlet_list
       if ( mod(step,DeltaStep2) == 0 ) then
         call write_pos1(step)
