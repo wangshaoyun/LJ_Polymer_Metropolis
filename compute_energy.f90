@@ -71,7 +71,7 @@ subroutine initialize_energy_parameters
   !Initialize fene parameters and array allocate.
   call build_fene_list
 
-  if (rc_lj<Lx/6) then
+  if (rc_lj<Lx/20) then
     !
     !Initialize lj parameters and array allocate.
     call initialize_lj_parameters
@@ -142,7 +142,7 @@ subroutine LJ_energy (EE)
   integer :: i, j, k, l, m
   real*8  :: rr, rij(3), inv_rr2, inv_rr6
 
-  if (rc_lj>Lx/6) then
+  if (rc_lj>Lx/10) then
     do i = 1, NN-1
       do j = i+1, NN
         call rij_and_rr( rij, rr, i, j )
@@ -243,7 +243,7 @@ subroutine update_verlet_list
   use global_variables
   implicit none
 
-  if ( mod(step, nint(rsk_lj/dr/2)) == 0 .and. rc_lj<Lx/6 ) then
+  if ( mod(step, nint(rsk_lj/dr/2)) == 0 .and. rc_lj<Lx/20 ) then
     call build_lj_verlet_list
   end if
 
@@ -316,7 +316,7 @@ subroutine Delta_lj_Energy(DeltaE)
   sigma2 = sigma * sigma
   rc_lj2 = rc_lj * rc_lj
 
-  if (rc_lj>Lx/6) then
+  if (rc_lj>Lx/20) then
     do i = 1, NN
       if ( i == ip ) cycle
       !
@@ -484,7 +484,7 @@ subroutine read_energy_parameters
     read(100,*) Kvib
   close(100)
 
-  if (rc_lj>Lx/6) then
+  if (rc_lj>Lx/20) then
     rc_lj = Lx/2
     write(*,*) 'Does not use verlet list!'
     write(*,*) 'rc_lj=', rc_lj
