@@ -1,8 +1,6 @@
 1D-1            ! rho
 0.83333D0       ! Beta:     1/kT, T=298K
-40              ! Nml
-100             ! Ngl
-1               ! R_bond
+100             ! NN
 5000000         ! StepNum0
 10000000        ! StepNum:  steps of running
 500             ! DeltaStep1: compute physical quantities.

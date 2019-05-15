@@ -2,6 +2,4 @@
 1                   !sigma       
 1.12246D0           !rc_lj       
 1.81246D0           !rv_lj       
-0.7D0               !rsk_lj  
-1                   !R0_2        
-400D0               !Kvir           
+0.7D0               !rsk_lj            

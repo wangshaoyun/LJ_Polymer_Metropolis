@@ -29,9 +29,6 @@ subroutine initialize_parameters
   !Input parameters
   call read_data
 
-  ! data operation
-  NN = Nml*Ngl
-
   Lx = (NN/rho)**(1./3)
   Ly = Lx
   Lz = Lx
@@ -53,9 +50,7 @@ subroutine read_data
   open(unit=100, file='system_data.txt')
     read(100,*) rho
     read(100,*) Beta
-    read(100,*) Nml
-    read(100,*) Ngl
-    read(100,*) R_bond
+    read(100,*) NN
     read(100,*) StepNum0
     read(100,*) StepNum
     read(100,*) DeltaStep1
@@ -73,10 +68,7 @@ subroutine write_data_to_screen
   implicit none
 
   write(*,*) '******************system_data***********************'
-  write(*,*) 'Total chains,             Ngl:',    Ngl
-  write(*,*) 'Particles of each chain,  Nml:',    Nml
   write(*,*) 'Total particles,          NN :',    NN
-  write(*,*) 'Bond length of polymer,   R_bond:', R_bond
   write(*,*) 'Length of the box,        Lx :',    Lx
   write(*,*) 'Width of the box,         Ly :',    Ly
   write(*,*) 'Height of the box,        Lz :',    Lz

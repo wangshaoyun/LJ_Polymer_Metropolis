@@ -20,11 +20,6 @@ module compute_energy
   real*8,  private :: rsk_lj      !Skin between cut off sphere and verlet list 
                                   !sphere
   integer, private :: npair1      !number of pairs in the lj verlet sphere
-!
-!fene potential
-  real*8,  private :: R0_2        !Max bond length R0 square in FENE potential
-  real*8,  private :: Kvib        !FENE spring constant k
-  integer, private :: N_bond      !Number of Chemical bond of polymers
 !##########end coefficient in potential function###########!
 
 
@@ -35,10 +30,6 @@ module compute_energy
                                   !the particles near i are from
                                   !lj_pair_list(lj_point(i-1)) to 
                                   !lj_pair_list(lj_point(i))
-  integer, allocatable, dimension( : ), private :: fene_list
-                                  !list of chemical bonds
-  integer, allocatable, dimension( : ), private :: fene_point
-                                  !same as lj_point and real_point
 !########################end arrays########################!
 
 
@@ -73,9 +64,6 @@ subroutine initialize_energy_parameters
   !
   !build lj_pair_list and lj_point
   call build_lj_verlet_list
-  !
-  !Initialize fene parameters and array allocate.
-  call build_fene_list
 
 end subroutine initialize_energy_parameters
 
@@ -100,8 +88,6 @@ subroutine total_energy (EE)
   EE=0
 
   call LJ_Energy(EE)
-
-  call FENE_Energy(EE)
 
 end subroutine total_energy
 
@@ -162,53 +148,6 @@ subroutine LJ_energy (EE)
 end subroutine LJ_energy
 
 
-subroutine FENE_energy(EE)
-  !--------------------------------------!
-  !Compute FENE potential energy.
-  !   
-  !Input
-  !   EE
-  !Output
-  !   EE
-  !External Variables
-  !   fene_list, fene_point
-  !   kFENE, Nbond, R0_2
-  !Routine Referenced:
-  !1. rij_and_rr
-  !Reference:
-  !1.Michael Murat, Gary S. Grest, 'Structure of a Grafted
-  !Polymer Brush: A Molecular Dynamics Simulation', Macromolecules,
-  !vol. 22, pp.4054-4059, (1989).
-  !The FENE potential was first derived on 1972.
-  !2.Harold R. Warner, 'Kinetic Theory and Rheology of Dilute 
-  !Suspensions of Finitely Extendible Dumbbells', Ind. Eng. Chem.
-  !Fundam., Vol. 11, No. 3, pp.379-387, (1972).
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  real*8, intent(inout) :: EE
-  integer :: i, j, k, l, m
-  real*8  :: rij(3), rr
-
-  do i = 1, NN
-    if ( i == 1 ) then
-      k = 1
-      l = fene_point(1)
-    else
-      k = fene_point(i-1) + 1
-      l = fene_point(i)
-    end if
-    do m = k, l
-      j = fene_list(m)
-      call rij_and_rr( rij, rr, i, j)
-      EE = EE + 0.5 * Kvib * (sqrt(rr)-1) * (sqrt(rr)-1) / 2
-      ! ! ! must divided by 2
-    end do
-  end do
-
-end subroutine FENE_energy
-
-
 subroutine update_verlet_list
   !--------------------------------------!
   !Judge whether renew verlet list or not
@@ -257,9 +196,6 @@ subroutine Delta_Energy(DeltaE)
   !
   !Compute energy of LJ potential
   call Delta_LJ_Energy(DeltaE)
-  !
-  !Compute Delta energy of FENE potential
-  call Delta_FENE_Energy(DeltaE)
 
 end subroutine Delta_Energy
 
@@ -346,71 +282,6 @@ subroutine Delta_lj_Energy(DeltaE)
 end subroutine Delta_lj_Energy
 
 
-subroutine Delta_FENE_Energy(DeltaE)
-  !--------------------------------------!
-  !
-  !   
-  !Input
-  !   DeltaE
-  !Output
-  !   DeltaE
-  !External Variables
-  !   pos, fene_list, fene_point
-  !   pos_ip0, pos_ip1, ip
-  !   Lx, Ly, Lz, kFENE, R0_2
-  !Routine Referenced:
-  !
-  !Reference:
-  !1.Michael Murat, Gary S. Grest, 'Structure of a Grafted
-  !Polymer Brush: A Molecular Dynamics Simulation', Macromolecules,
-  !vol. 22, pp.4054-4059, (1989).
-  !The FENE potential was first derived on 1972.
-  !2.Harold R. Warner, 'Kinetic Theory and Rheology of Dilute 
-  !Suspensions of Finitely Extendible Dumbbells', Ind. Eng. Chem.
-  !Fundam., Vol. 11, No. 3, pp.379-387, (1972).
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  real*8, intent(inout) :: DeltaE
-  integer :: i, j, k, l, m
-  real*8  :: rr, rij(3)
-
-  if (ip==1) then
-    l = 1
-    m = fene_point(ip)
-  else 
-    l = fene_point(ip-1)+1
-    m = fene_point(ip)
-  end if
-  do k= l, m
-    i = fene_list(k)
-    !
-    !Energy of FENE potential of odd configuration
-    !
-    rij = pos(i,1:3) - pos_ip0(1:3)
-    !
-    !Peridoic condition
-    call periodic_condition(rij)
-    rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
-    DeltaE = DeltaE - 0.5 * Kvib * (rr-1) * (rr-1)
-    !
-    !Energy of FENE potential of new configuration
-    !
-    rij = pos(i,1:3) - pos_ip1(1:3)
-    !
-    !Periodic condition
-    call periodic_condition(rij)
-    rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
-!     if ( rr > R0_2 ) then
-!       write(*,*) 'Chemical bonds are Broken off!'
-!       stop
-!     end if
-    DeltaE = DeltaE + 0.5 * Kvib * (rr-1) * (rr-1)
-  enddo
-
-end subroutine Delta_FENE_Energy
-
-
 subroutine read_energy_parameters
   !--------------------------------------!
   !
@@ -424,8 +295,6 @@ subroutine read_energy_parameters
     read(100,*) rc_lj
     read(100,*) rv_lj
     read(100,*) rsk_lj
-    read(100,*) R0_2
-    read(100,*) Kvib
   close(100)
 
 end subroutine read_energy_parameters
@@ -547,47 +416,6 @@ subroutine build_lj_verlet_list
   npair1=k
   deallocate(hoc)
 end subroutine build_lj_verlet_list
-
-
-subroutine build_fene_list
-  !--------------------------------------!
-  !Construct the fene_list array.
-  !   
-  !Input
-  !   
-  !Output
-  !   fene_list, fene_point
-  !External Variables
-  !   N_bond, Npe, Nml, Ngl
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  integer :: i, j, k, l
-
-  N_bond = Ngl * (Nml-1) * 2
-  allocate( fene_list(N_bond) )
-  allocate( fene_point(NN) )
-
-  l = 0
-  do i = 1, NN
-    if ( mod( i, Nml ) == 1 ) then
-      l = l + 1
-      fene_list(l)  = i + 1 
-      fene_point(i) = l
-    elseif( mod( i, Nml ) == 0 ) then
-      l = l + 1
-      fene_list(l)  = i - 1
-      fene_point(i) = l
-    else
-      l = l + 1
-      fene_list(l)  = i - 1
-      l = l + 1
-      fene_list(l)  = i + 1
-      fene_point(i) = l
-    end if
-  end do
-
-end subroutine build_fene_list
 
 
 subroutine compute_pressure (pressure)

@@ -9,14 +9,11 @@ module global_variables
 !########################constants#########################!
 
 !####################systems coefficient###################!
-  integer :: Ngl      !Number of linear chains
-  integer :: Nml      !Number of monomers in each chain
   integer :: NN       !Total particles in the system
   real*8  :: rho      !Polymer monomer number density 
   real*8  :: Lx       !Length of cell in x direction
   real*8  :: Ly       !Length of cell in y direction
   real*8  :: Lz       !Length of cell in z direction
-  real*8  :: R_bond   !Initial bond length of polymers
   real*8  :: Beta     !Beta=1/(kB*T), T is temperature, 
                       !kB is Boltzmann constant
 !##################end systems coefficient#################!
@@ -30,7 +27,6 @@ module global_variables
   integer :: DeltaStep2           !step inteval, write data
   integer :: step                 !steps of calculate the physical quantities
   real*8  :: dr                   !length of each moving
-  real*8  :: std                  !std of regrow bonds
   real*8  :: total_num = 0        !Total choose number
   real*8  :: accpt_num = 0        !accepted number
   real*8  :: accpt_ratio          !accepted ratio
