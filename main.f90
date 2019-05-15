@@ -6,7 +6,7 @@ use compute_energy
 implicit none
 
 !##########Data Dictionary############!
-  integer :: i, j, k
+  integer :: i
   real*8  :: EE        ! Total Energy before move
   real*8  :: EE1       ! Total Energy after move
   real*8  :: DeltaE    ! Energy difference

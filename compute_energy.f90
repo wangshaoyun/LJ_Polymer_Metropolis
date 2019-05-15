@@ -494,12 +494,10 @@ subroutine compute_pressure (pressure)
   do i = 1, NN-1
     do j = i+1, NN
       call rij_and_rr(rij, rr, i, j)
-      if (rr<rc_lj2) then
-        inv_r2 = sigma*sigma / rr
-        inv_r6 = inv_r2*inv_r2*inv_r2
-        fij = 48 * epsilon * inv_r2 * inv_r6 * (inv_r6-0.5) * rij
-        vir = vir + dot_product(fij,rij)/3
-      end if
+      inv_r2 = sigma*sigma / rr
+      inv_r6 = inv_r2*inv_r2*inv_r2
+      fij = 48 * epsilon * inv_r2 * inv_r6 * (inv_r6-0.5) * rij
+      vir = vir + dot_product(fij,rij)/3
     end do 
   end do
   pressure = rho / Beta + vir / (Lx*Ly*Lz)

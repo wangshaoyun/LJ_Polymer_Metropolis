@@ -27,7 +27,7 @@ subroutine Initialize_position
   use global_variables
   implicit none
   integer :: i, j, m
-  real*8 :: theta, rnd1, rnd2, rnd3, rsqr
+  real*8 :: rnd1, rnd2, rnd3, rsqr
   real*8, dimension(3) :: rij
 
   do i=1, NN
@@ -48,7 +48,7 @@ subroutine Initialize_position
       !too much.
       do j=1,i-1
         call rij_and_rr(rij,rsqr,i,j)
-        if (rsqr<1) then
+        if (rsqr<0.81) then
           m=1
           cycle
         end if

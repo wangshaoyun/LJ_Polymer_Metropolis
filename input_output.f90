@@ -138,8 +138,8 @@ subroutine compute_physical_quantities
   
   Rg     = 0
   do i = 1, NN-1
-    do j = i, NN
-        call rij_and_rr(rij, rr, j, k)
+    do j = i+1, NN
+        call rij_and_rr(rij, rr, i, j)
         Rg  = Rg + rr
     end do
   end do
