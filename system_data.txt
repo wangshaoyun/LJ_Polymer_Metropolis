@@ -1,12 +1,12 @@
-1D-1            ! rho
-0.83333D0       ! Beta:     1/kT, T=298K
-40              ! Nml
-100             ! Ngl
+4D-1            ! rho
+0.5263D0        ! Beta:     1/kT, T=298K
+15               ! Nml
+50              ! Ngl
 1               ! R_bond
-5000000         ! StepNum0
-10000000        ! StepNum:  steps of running
-500             ! DeltaStep1: compute physical quantities.
-1000            ! DeltaStep2: output.
-0.1D0           ! dr:       distance of each move
+20000           ! StepNum0
+50000           ! StepNum:  steps of running
+200             ! DeltaStep1: compute physical quantities.
+200             ! DeltaStep2: output.
+0.05D0          ! dr:       distance of each move
 0.3D0           ! best_accpt_ratio
-2D-3            ! Delta dr
+5D-3            ! Delta dr
