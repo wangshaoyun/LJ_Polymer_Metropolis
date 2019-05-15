@@ -2,7 +2,7 @@ module input_output
   implicit none
   
   save
-
+  real*8, allocatable, dimension(:,:), private :: rdf
   contains
 
 subroutine initialize_parameters
@@ -90,6 +90,9 @@ subroutine allocatte_arrays_and_initialize
   implicit none
 
   allocate( pos(NN, 3) )
+  allocate( rdf(500,2) )
+
+  rdf = 0
 
 end subroutine allocatte_arrays_and_initialize
 
@@ -112,6 +115,10 @@ subroutine continue_read_data(l)
     read(19,*) dr
     read(19,*) total_time
   close(19)
+
+  open(21, file = './data/rdf.txt')
+    read(21,*) ((rdf(i,j),j=1,2),i=1,500)
+  close(21)
   
 end subroutine continue_read_data
 
@@ -150,12 +157,41 @@ subroutine compute_physical_quantities
   !
   !Output Pressure
   open(37, position='append', file='./data/pressure.txt')
-    write(37,370) 1.*j, Rg, pressure
+    write(37,370) 1.*step, Rg, pressure
     370 format(3F15.6)
   close(37)
   
 end subroutine compute_physical_quantities
 
+
+subroutine compute_radial_distribution_function
+  use global_variables
+  implicit none
+  integer :: i,j,k
+  real*8  :: rr, del_r, ri
+  real*8, dimension(3) :: rij
+
+  del_r = Lx/2/500
+
+  do i = 1, NN-1
+    do j = i+1, NN
+      call rij_and_rr(rij,rr,i,j)
+      if (sqrt(rr)<Lx/2) then
+        k = int( sqrt(rr)/del_r ) + 1
+        rdf(k,2) = rdf(k,2) + 2 
+      end if
+    end do 
+  end do 
+
+  open(31,file='./data/rdf.txt')
+    do i=1, 500
+      ri = (i-0.5) * del_r
+      write(31,310) del_r*i, rdf(i,2)/ri/ri/del_r
+      310 format(2F20.6)
+    end do
+  close(31)
+
+end subroutine compute_radial_distribution_function
 
 subroutine write_pos
   !----------------------------------------!
