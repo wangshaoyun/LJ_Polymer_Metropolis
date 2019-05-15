@@ -26,7 +26,7 @@ subroutine Initialize_position
   !--------------------------------------!
   use global_variables
   implicit none
-  integer :: i, j, m,
+  integer :: i, j, m
   real*8 :: theta, rnd1, rnd2, rnd3, rsqr
   real*8, dimension(3) :: rij
 
@@ -42,7 +42,7 @@ subroutine Initialize_position
       pos(i,3)=rnd3 * Lz - Lz/2
       !
       !periodic condition
-      call periodic_condition(pos(l,1:3))
+      call periodic_condition(pos(i,1:3))
       !
       !Judge whether the particle is close the former paritcle
       !too much.
@@ -81,7 +81,7 @@ subroutine Monte_Carlo_Move( EE, DeltaE )
   real*8 :: EE1, EE2
 
   do j = 1, NN
-  !     call total_energy(EE1)
+!       call total_energy(EE1)
 
     call Choose_Particle
     call New_Position
@@ -89,8 +89,8 @@ subroutine Monte_Carlo_Move( EE, DeltaE )
     call Move_or_not(EE, DeltaE)
     !
     !test EE2-EE1 = DeltaE
-  !     call total_energy(EE2)
-  !     write(*,*) EE2 - EE1, DeltaE, EE2, EE1  
+!       call total_energy(EE2)
+!       write(*,*) EE2 - EE1, DeltaE, EE2, EE1  
   end do
 
 end subroutine Monte_Carlo_Move
@@ -168,13 +168,13 @@ subroutine Move_or_not(EE, DeltaE)
   !
   !Judge whether move or not
   if ( DeltaE < 0 ) then
-    pos(ip,1:3) = pos(ip,1:3) + pos_ip1(1:3) - pos_ip0(1:3)
+    pos(ip,1:3) = pos_ip1(1:3)
     EE = EE + DeltaE
     accpt_num = accpt_num + 1
   else 
     call random_number(rnd)
     if ( rnd < Exp(-Beta*DeltaE) ) then
-      pos(ip,1:3) = pos(ip,1:3) + pos_ip1(1:3) - pos_ip0(1:3)
+      pos(ip,1:3) = pos_ip1(1:3)
       EE = EE + DeltaE
       accpt_num = accpt_num + 1
     endif

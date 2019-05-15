@@ -246,8 +246,6 @@ subroutine write_time(time)
     write(10,*) 'Lx:           ', real(Lx)
     write(10,*) 'Ly:           ', real(Ly)
     write(10,*) 'Lz:           ', real(Lz)
-    write(10,*) 'Ngl:          ', Ngl
-    write(10,*) 'Nml:          ', Nml
     write(10,*) 'NN:           ', NN
   close(10)
 

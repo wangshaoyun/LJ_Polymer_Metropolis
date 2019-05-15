@@ -53,6 +53,7 @@ implicit none
   if ( i <= StepNum0 ) then
     do step = i, StepNum0
       call Monte_Carlo_Move(EE, DeltaE)
+!       write(*,*) EE,DeltaE
       if ( mod(step,DeltaStep1) == 0 ) then
         call compute_physical_quantities
         call total_energy(EE1)

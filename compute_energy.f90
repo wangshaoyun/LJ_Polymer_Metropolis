@@ -58,12 +58,15 @@ subroutine initialize_energy_parameters
   !
   !read energy parameters from file
   call read_energy_parameters
-  !
-  !Initialize lj parameters and array allocate.
-  call initialize_lj_parameters
-  !
-  !build lj_pair_list and lj_point
-  call build_lj_verlet_list
+
+  if (rc_lj<Lx/4) then
+    !
+    !Initialize lj parameters and array allocate.
+    call initialize_lj_parameters
+    !
+    !build lj_pair_list and lj_point
+    call build_lj_verlet_list
+  end if
 
 end subroutine initialize_energy_parameters
 
@@ -125,25 +128,36 @@ subroutine LJ_energy (EE)
   integer :: i, j, k, l, m
   real*8  :: rr, rij(3), inv_rr2, inv_rr6
 
-  do i = 1, NN
-    if ( i == 1) then
-      k = 1
-      l = lj_point(1)
-    else
-      k = lj_point(i-1)+1
-      l = lj_point(i)
-    end if
-    do m = k, l
-      j = lj_pair_list(m)
-      call rij_and_rr( rij, rr, i, j )
-      if ( rr < rc_lj * rc_lj ) then
+  if (rc_lj>Lx/4) then
+    do i = 1, NN-1
+      do j = i+1, NN
+        call rij_and_rr( rij, rr, i, j )
         inv_rr2  = sigma*sigma/rr
         inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
-        EE = EE + 4 * epsilon * ( inv_rr6 * inv_rr6 - inv_rr6 + 0.25D0) / 2
-        ! ! ! must divided by 2 because of the repeating cycle
-      end if
+        EE = EE + 4 * epsilon * ( inv_rr6 * inv_rr6 - inv_rr6 + 0.25D0)
+      end do
     end do
-  end do
+  else
+    do i = 1, NN
+      if ( i == 1) then
+        k = 1
+        l = lj_point(1)
+      else
+        k = lj_point(i-1)+1
+        l = lj_point(i)
+      end if
+      do m = k, l
+        j = lj_pair_list(m)
+        call rij_and_rr( rij, rr, i, j )
+        if ( rr < rc_lj * rc_lj ) then
+          inv_rr2  = sigma*sigma/rr
+          inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
+          EE = EE + 4 * epsilon * ( inv_rr6 * inv_rr6 - inv_rr6 + 0.25D0) / 2
+          ! ! ! must divided by 2 because of the repeating cycle
+        end if
+      end do
+    end do
+  end if
 
 end subroutine LJ_energy
 
@@ -164,7 +178,7 @@ subroutine update_verlet_list
   use global_variables
   implicit none
 
-  if ( mod(step, nint(rsk_lj/dr)*2) == 0 ) then
+  if ( mod(step, nint(rsk_lj/dr/2)) == 0 .and. rc_lj<Lx/4 ) then
     call build_lj_verlet_list
   end if
 
@@ -233,50 +247,84 @@ subroutine Delta_lj_Energy(DeltaE)
   EE     = 0
   sigma2 = sigma * sigma
   rc_lj2 = rc_lj * rc_lj
-  if (ip==1) then
-    k = 1
-    l = lj_point( ip )
-  else
-    k = lj_point( ip-1 ) + 1
-    l = lj_point( ip )
-  end if
 
-  do j= k, l
-    i = lj_pair_list(j)
-    !
-    !Energy of old configuration
-    !
-    rij = pos(i, 1:3) - pos_ip0(1:3)
-    !
-    !periodic condition
-    call periodic_condition(rij)
-    !
-    !lj energy
-    rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
-    if ( rr < rc_lj2 ) then
+  if (rc_lj>Lx/4) then
+    do i = 1, NN
+      if ( i == ip ) cycle
+      !
+      !Energy of old configuration
+      !
+      rij = pos(i, 1:3) - pos_ip0(1:3)
+      !
+      !periodic condition
+      call periodic_condition(rij)
+      !
+      !lj energy
+      rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
       inv_rr2  = sigma2 / rr
       inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
       inv_rr12 = inv_rr6 * inv_rr6
       EE       = EE + inv_rr6 - inv_rr12 - 0.25D0
-    end if
-    !
-    !Energy of new configuration
-    !
-    rij = pos(i, 1:3) - pos_ip1(1:3)
-    !
-    !periodic condition
-    call periodic_condition(rij)
-    !
-    !lj energy
-    rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
-    if ( rr < rc_lj2 ) then
+      !
+      !Energy of new configuration
+      !
+      rij = pos(i, 1:3) - pos_ip1(1:3)
+      !
+      !periodic condition
+      call periodic_condition(rij)
+      !
+      !lj energy
+      rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
       inv_rr2  = sigma2 / rr
       inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
       inv_rr12 = inv_rr6 * inv_rr6
       EE       = EE + inv_rr12 - inv_rr6 + 0.25D0
+    end do
+  else
+    if (ip==1) then
+      k = 1
+      l = lj_point( ip )
+    else
+      k = lj_point( ip-1 ) + 1
+      l = lj_point( ip )
     end if
-  end do
 
+    do j= k, l
+      i = lj_pair_list(j)
+      !
+      !Energy of old configuration
+      !
+      rij = pos(i, 1:3) - pos_ip0(1:3)
+      !
+      !periodic condition
+      call periodic_condition(rij)
+      !
+      !lj energy
+      rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
+      if ( rr < rc_lj2 ) then
+        inv_rr2  = sigma2 / rr
+        inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
+        inv_rr12 = inv_rr6 * inv_rr6
+        EE       = EE + inv_rr6 - inv_rr12 - 0.25D0
+      end if
+      !
+      !Energy of new configuration
+      !
+      rij = pos(i, 1:3) - pos_ip1(1:3)
+      !
+      !periodic condition
+      call periodic_condition(rij)
+      !
+      !lj energy
+      rr = rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3)
+      if ( rr < rc_lj2 ) then
+        inv_rr2  = sigma2 / rr
+        inv_rr6  = inv_rr2 * inv_rr2 * inv_rr2
+        inv_rr12 = inv_rr6 * inv_rr6
+        EE       = EE + inv_rr12 - inv_rr6 + 0.25D0
+      end if
+    end do
+  end if
   DeltaE = DeltaE + 4 * epsilon * EE
 
 end subroutine Delta_lj_Energy
@@ -296,6 +344,10 @@ subroutine read_energy_parameters
     read(100,*) rv_lj
     read(100,*) rsk_lj
   close(100)
+
+  if (rc_lj>Lx/2) then
+    rc_lj = Lx/2
+  end if
 
 end subroutine read_energy_parameters
 
@@ -439,7 +491,7 @@ subroutine compute_pressure (pressure)
 
   vir = 0
   rc_lj2 = rc_lj * rc_lj
-  do i = 1, NN
+  do i = 1, NN-1
     do j = i+1, NN
       call rij_and_rr(rij, rr, i, j)
       if (rr<rc_lj2) then
@@ -449,22 +501,6 @@ subroutine compute_pressure (pressure)
         vir = vir + dot_product(fij,rij)/3
       end if
     end do 
-    if ( mod(i,Nml)==1 ) then
-      call rij_and_rr(rij, rr, i, i+1)
-      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
-      vir = vir + dot_product(fij,rij)/3/2
-    elseif ( mod(i,Nml)==0 ) then
-      call rij_and_rr(rij, rr, i, i-1)
-      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
-      vir = vir + dot_product(fij,rij)/3/2
-    else
-      call rij_and_rr(rij, rr, i, i+1)
-      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
-      vir = vir + dot_product(fij,rij)/3/2
-      call rij_and_rr(rij, rr, i, i-1)
-      fij = Kvib * ( 1 - sqrt(R0_2/rr) ) * rij
-      vir = vir + dot_product(fij,rij)/3/2
-    end if
   end do
   pressure = rho / Beta + vir / (Lx*Ly*Lz)
 

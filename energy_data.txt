@@ -1,5 +1,5 @@
-0                   !epsilon     
+1                   !epsilon     
 1                   !sigma       
-1.12246D0           !rc_lj       
-1.81246D0           !rv_lj       
-0.7D0               !rsk_lj            
+5.52246D0           !rc_lj       
+6.52246D0           !rv_lj       
+1D0                 !rsk_lj            
