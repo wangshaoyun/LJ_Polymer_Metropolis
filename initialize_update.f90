@@ -303,7 +303,13 @@ subroutine adjust_move_distance
 
   accpt_ratio = accpt_num / total_num
   delta_accpt_ratio = accpt_ratio - best_accpt_ratio 
-  dr = dr + delta_dr * delta_accpt_ratio / abs(delta_accpt_ratio)
+  if (delta_accpt_ratio>0) then
+    dr = dr + delta_dr 
+  elseif (delta_accpt_ratio<0) then
+    dr = dr - delta_dr
+  else
+    dr = dr
+  end if
 
   accpt_num = 0
   total_num = 0

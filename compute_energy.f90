@@ -243,7 +243,7 @@ subroutine update_verlet_list
   use global_variables
   implicit none
 
-  if ( mod(step, nint(rsk_lj/dr/2)) == 0 .and. rc_lj<Lx/6 ) then
+  if ( mod(step, nint(rsk_lj/dr/2)) == 0 .and. rc_lj<(Lx/6) ) then
     call build_lj_verlet_list
   end if
 
