@@ -35,10 +35,6 @@ module compute_energy
                                   !the particles near i are from
                                   !lj_pair_list(lj_point(i-1)) to 
                                   !lj_pair_list(lj_point(i))
-  integer, allocatable, dimension( : ), private :: fene_list
-                                  !list of chemical bonds
-  integer, allocatable, dimension( : ), private :: fene_point
-                                  !same as lj_point and real_point
 !########################end arrays########################!
 
 
@@ -67,9 +63,6 @@ subroutine initialize_energy_parameters
   !
   !read energy parameters from file
   call read_energy_parameters
-  !
-  !Initialize fene parameters and array allocate.
-  call build_fene_list
 
   if (rc_lj<Lx/20) then
     !
@@ -104,9 +97,21 @@ subroutine total_energy (EE)
 
   call LJ_Energy(EE)
 
-  call FENE_Energy(EE)
-
 end subroutine total_energy
+
+
+subroutine enerex(ic, ib, xt, i, eni)
+  use global_variables
+  implicit none
+  integer, intent(in) :: ic
+  integer, intent(in) :: ib
+  integer, intent(in) :: i
+  real*8, intent(out) :: eni
+  real*8, dimension(3), intent(in) :: xt
+
+  
+
+end subroutine enerex
 
 
 subroutine LJ_energy (EE)
@@ -174,80 +179,6 @@ subroutine LJ_energy (EE)
   end if
 
 end subroutine LJ_energy
-
-
-subroutine FENE_energy(EE)
-  !--------------------------------------!
-  !Compute FENE potential energy.
-  !   
-  !Input
-  !   EE
-  !Output
-  !   EE
-  !External Variables
-  !   fene_list, fene_point
-  !   kFENE, Nbond, R0_2
-  !Routine Referenced:
-  !1. rij_and_rr
-  !Reference:
-  !1.Michael Murat, Gary S. Grest, 'Structure of a Grafted
-  !Polymer Brush: A Molecular Dynamics Simulation', Macromolecules,
-  !vol. 22, pp.4054-4059, (1989).
-  !The FENE potential was first derived on 1972.
-  !2.Harold R. Warner, 'Kinetic Theory and Rheology of Dilute 
-  !Suspensions of Finitely Extendible Dumbbells', Ind. Eng. Chem.
-  !Fundam., Vol. 11, No. 3, pp.379-387, (1972).
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  real*8, intent(inout) :: EE
-  integer :: i, j, k, l, m
-  real*8  :: rij(3), rr
-
-  do i = 1, NN
-    if ( i == 1 ) then
-      k = 1
-      l = fene_point(1)
-    else
-      k = fene_point(i-1) + 1
-      l = fene_point(i)
-    end if
-    do m = k, l
-      j = fene_list(m)
-      call rij_and_rr( rij, rr, i, j)
-      if ( sqrt(rr)<1.5 .or. sqrt(rr) >0.5 ) then
-        EE = EE + 0.5*Kvib*(sqrt(rr)-sqrt(R0_2))*(sqrt(rr)-sqrt(R0_2))/2
-      else
-        write(*,*) "chemical bonds break off!"
-      end if
-      ! ! ! must divided by 2
-    end do
-  end do
-
-end subroutine FENE_energy
-
-
-subroutine update_verlet_list
-  !--------------------------------------!
-  !Judge whether renew verlet list or not
-  !   
-  !Input
-  !   EE
-  !Output
-  !   EE
-  !External Variables
-  !   Nq
-  !Routine Referenced:
-  !1.
-  !--------------------------------------!
-  use global_variables
-  implicit none
-
-  if ( mod(step, nint(rsk_lj/dr/2)) == 0 .and. rc_lj<Lx/20 ) then
-    call build_lj_verlet_list
-  end if
-
-end subroutine update_verlet_list
 
 
 subroutine Delta_Energy(DeltaE)
@@ -399,74 +330,6 @@ subroutine Delta_lj_Energy(DeltaE)
 end subroutine Delta_lj_Energy
 
 
-subroutine Delta_FENE_Energy(DeltaE)
-  !--------------------------------------!
-  !
-  !   
-  !Input
-  !   DeltaE
-  !Output
-  !   DeltaE
-  !External Variables
-  !   pos, fene_list, fene_point
-  !   pos_ip0, pos_ip1, ip
-  !   Lx, Ly, Lz, kFENE, R0_2
-  !Routine Referenced:
-  !
-  !Reference:
-  !1.Michael Murat, Gary S. Grest, 'Structure of a Grafted
-  !Polymer Brush: A Molecular Dynamics Simulation', Macromolecules,
-  !vol. 22, pp.4054-4059, (1989).
-  !The FENE potential was first derived on 1972.
-  !2.Harold R. Warner, 'Kinetic Theory and Rheology of Dilute 
-  !Suspensions of Finitely Extendible Dumbbells', Ind. Eng. Chem.
-  !Fundam., Vol. 11, No. 3, pp.379-387, (1972).
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  real*8, intent(inout) :: DeltaE
-  integer :: i, j, k, l, m
-  real*8  :: rr, rij(3)
-
-  if (ip==1) then
-    l = 1
-    m = fene_point(ip)
-  else 
-    l = fene_point(ip-1)+1
-    m = fene_point(ip)
-  end if
-  do k= l, m
-    i = fene_list(k)
-    !
-    !Energy of FENE potential of odd configuration
-    !
-    rij = pos(i,1:3) - pos_ip0(1:3)
-    !
-    !Peridoic condition
-    call periodic_condition(rij)
-    rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
-    if ( rr > 1.5 .or. rr < 0.5 ) then
-      write(*,*) "Chemical bonds break off!"
-    end if
-    DeltaE = DeltaE - 0.5 * Kvib * (rr-1) * (rr-1)
-    !
-    !Energy of FENE potential of new configuration
-    !
-    rij = pos(i,1:3) - pos_ip1(1:3)
-    !
-    !Periodic condition
-    call periodic_condition(rij)
-    rr = sqrt(rij(1) * rij(1) + rij(2) * rij(2) + rij(3) * rij(3))
-    if ( rr > 1.5 .or. rr < 0.5 ) then
-      DeltaE = DeltaE + 1e10
-    else
-      DeltaE = DeltaE + 0.5 * Kvib * (rr-sqrt(R0_2)) * (rr-sqrt(R0_2))
-    end if
-  enddo
-
-end subroutine Delta_FENE_Energy
-
-
 subroutine read_energy_parameters
   !--------------------------------------!
   !
@@ -491,165 +354,6 @@ subroutine read_energy_parameters
   end if
 
 end subroutine read_energy_parameters
-
-
-subroutine initialize_lj_parameters
-  !--------------------------------------!
-  !
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  real*8 :: v_verlet
-  !
-  !allocate verlet list of LJ potential
-  if ( allocated(lj_point) ) deallocate(lj_point)
-  allocate(  lj_point(NN)  )
-  lj_point = 0
-  v_verlet = 8.D0/3 * pi * rv_lj**3
-  if ( allocated(lj_pair_list) ) deallocate(lj_pair_list)
-  allocate(  lj_pair_list(100*NN*ceiling(rho*v_verlet))  )
-  lj_pair_list = 0
-
-end subroutine initialize_lj_parameters
-
-
-subroutine build_lj_verlet_list
-  !--------------------------------------!
-  !Construct lj_pair_list and lj_point by the link list
-  !method with the complexity of O(N)
-  !   
-  !Input
-  !   pos
-  !Output
-  !   lj_pair_list, lj_point
-  !External Variables
-  !   NN, Lx, Ly, Lz, rv_lj, lj_pair_list, lj_point, pos
-  !Routine Referenced:
-  !1. rij_and_rr(rij, rr, i, j)
-  !Reference:
-  !Frenkel, Smit, 'Understanding molecular simulation: from
-  !algorithm to applications', Elsevier, 2002, pp.550-552. 
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  integer i,j,k,l,m,n,p,q,r,maxnab
-  integer icel,jcel,kcel,ncel1,ncel2,ncel3
-  real*8, dimension(3) :: rij
-  real*8 :: rsqr,rcel1,rcel2,rcel3
-  integer, dimension(NN) :: cell_list
-  integer,allocatable,dimension(:,:,:)::hoc
-
-  ncel1=int(Lx/rv_lj)   !number of cell in x direction
-  ncel2=int(Ly/rv_lj)   !number of cell in y direction
-  ncel3=int(Lz/rv_lj)   !number of cell in z direction
-  allocate(hoc(0:ncel1-1,0:ncel2-1,0:ncel3-1))
-
-  maxnab=size(lj_pair_list)
-  hoc=0
-  rcel1=Lx/ncel1      !Size of each cell in x direction
-  rcel2=Ly/ncel2      !Size of each cell in y direction
-  rcel3=Lz/ncel3      !Size of each cell in z direction
-  do i=1,NN
-    icel=int((pos(i,1)+Lx/2)/rcel1)
-    jcel=int((pos(i,2)+Ly/2)/rcel2)
-    kcel=int((pos(i,3)+Lz/2)/rcel3)
-    cell_list(i)=hoc(icel,jcel,kcel)
-    hoc(icel,jcel,kcel)=i
-  end do
-
-  k=0
-  do i=1,NN
-    icel=int((pos(i,1)+Lx/2)/rcel1)  
-    jcel=int((pos(i,2)+Ly/2)/rcel2)
-    kcel=int((pos(i,3)+Lz/2)/rcel3)
-    do l=-1,1
-      if (icel+l .ge. ncel1) then
-        p=icel+l-ncel1
-      elseif(icel+l<0) then
-        p=icel+l+ncel1
-      else
-        p=icel+l
-      end if
-      do m=-1,1
-        if (jcel+m .ge. ncel2) then
-          q=jcel+m-ncel2
-        elseif(jcel+m<0) then
-          q=jcel+m+ncel2
-        else
-          q=jcel+m
-        end if
-        do n=-1,1
-          if (kcel+n .ge. ncel3) then
-            r=kcel+n-ncel3
-          elseif(kcel+n<0) then
-            r=kcel+n+ncel3
-          else
-            r=kcel+n
-          end if
-          j=hoc(p,q,r)
-          do while (j /= 0)
-            call rij_and_rr(rij,rsqr,i,j)
-            if ( i/=j .and. rsqr<(rv_lj*rv_lj) ) then
-              k = k + 1
-              if ( k > maxnab ) then
-                write(*,*) 'maxnab', maxnab
-                write(*,*) 'k',  k
-                write(*,*) 'lj verlet list is too small!'
-                stop
-              end if
-              lj_pair_list(k)=j
-            end if
-            j=cell_list(j)
-          end do
-        end do
-      end do
-    end do
-    lj_point(i)=k
-  end do
-  npair1=k
-  deallocate(hoc)
-end subroutine build_lj_verlet_list
-
-
-subroutine build_fene_list
-  !--------------------------------------!
-  !Construct the fene_list array.
-  !   
-  !Input
-  !   
-  !Output
-  !   fene_list, fene_point
-  !External Variables
-  !   N_bond, Npe, Nml, Ngl
-  !--------------------------------------!
-  use global_variables
-  implicit none
-  integer :: i, j, k, l
-
-  N_bond = Ngl * (Nml-1) * 2
-  allocate( fene_list(N_bond) )
-  allocate( fene_point(NN) )
-
-  l = 0
-  do i = 1, NN
-    if ( mod( i, Nml ) == 1 ) then
-      l = l + 1
-      fene_list(l)  = i + 1 
-      fene_point(i) = l
-    elseif( mod( i, Nml ) == 0 ) then
-      l = l + 1
-      fene_list(l)  = i - 1
-      fene_point(i) = l
-    else
-      l = l + 1
-      fene_list(l)  = i - 1
-      l = l + 1
-      fene_list(l)  = i + 1
-      fene_point(i) = l
-    end if
-  end do
-
-end subroutine build_fene_list
 
 
 subroutine compute_pressure (pressure)
